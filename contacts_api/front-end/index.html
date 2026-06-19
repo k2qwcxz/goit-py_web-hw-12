@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contacts App</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
+  <script src="script.js"></script>
+  <style>
+    body { background: #f8f9fa; }
+    .card { border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .contact-card { border-left: 4px solid #007bff; margin-bottom: 12px; }
+    .contact-card:hover { border-left-color: #0056b3; background: #f0f4ff; }
+    .badge-birthday { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    h1 { font-weight: 700; color: #212529; }
+    .section-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container py-5" x-data="{
+    // auth state
+    loggedIn: false,
+    authMode: 'login', // 'login' | 'register'
+    authError: null,
+    loginForm: { email: '', password: '' },
+    registerForm: { email: '', password: '', first_name: '', last_name: '' },
+
+    contacts: [],
+    newContact: { first_name: '', last_name: '', email: '', phone: '', birthday: '', additional_data: '' },
+    search: { first_name: '', last_name: '', email: '' },
+    birthdays: [],
+    error: null,
+    showBirthdays: false,
+
+    async doLogin() {
+      try {
+        this.authError = null
+        await window.loginUser(this.loginForm.email, this.loginForm.password)
+        this.loggedIn = true
+        this.loginForm = { email: '', password: '' }
+        await this.loadContacts()
+      } catch (err) { this.authError = err.message }
+    },
+
+    async doRegister() {
+      try {
+        this.authError = null
+        await window.registerUser(this.registerForm)
+        // после успешной регистрации сразу логиним
+        await window.loginUser(this.registerForm.email, this.registerForm.password)
+        this.loggedIn = true
+        this.registerForm = { email: '', password: '', first_name: '', last_name: '' }
+        await this.loadContacts()
+      } catch (err) { this.authError = err.message }
+    },
+
+    doLogout() {
+      window.logoutUser()
+      this.loggedIn = false
+      this.contacts = []
+    },
+
+    async loadContacts() {
+      try {
+        this.error = null
+        this.contacts = await window.getContacts()
+      } catch (err) { this.error = err.message }
+    },
+
+    async addContact() {
+      try {
+        this.error = null
+        await window.createContact(this.newContact)
+        this.newContact = { first_name: '', last_name: '', email: '', phone: '', birthday: '', additional_data: '' }
+        await this.loadContacts()
+      } catch (err) { this.error = err.message }
+    },
+
+    async saveContact(contact) {
+      try {
+        this.error = null
+        await window.updateContact(contact)
+        contact.editing = false
+        await this.loadContacts()
+      } catch (err) { this.error = err.message }
+    },
+
+    async removeContact(id) {
+      try {
+        this.error = null
+        await window.deleteContact(id)
+        this.contacts = this.contacts.filter(c => c.id !== id)
+      } catch (err) { this.error = err.message }
+    },
+
+    async doSearch() {
+      try {
+        this.error = null
+        this.contacts = await window.searchContacts(this.search)
+      } catch (err) { this.error = err.message }
+    },
+
+    async loadBirthdays() {
+      try {
+        this.error = null
+        this.birthdays = await window.getUpcomingBirthdays()
+        this.showBirthdays = true
+      } catch (err) { this.error = err.message }
+    },
+
+    init() {
+      this.loggedIn = window.isLoggedIn()
+      if (this.loggedIn) this.loadContacts()
+    }
+  }" x-init="init()">
+
+    <div class="row">
+      <div class="col-md-8 offset-md-2">
+
+        <!-- ===================== AUTH SCREEN ===================== -->
+        <template x-if="!loggedIn">
+          <div>
+            <h1 class="mb-1">📒 Contacts</h1>
+            <p class="text-muted mb-4">Увійдіть або зареєструйтесь, щоб продовжити</p>
+
+            <div x-show="authError" class="alert alert-danger alert-dismissible">
+              <span x-text="authError"></span>
+              <button type="button" class="close" @click="authError = null"><span>&times;</span></button>
+            </div>
+
+            <div class="card mb-4">
+              <div class="card-body">
+
+                <ul class="nav nav-tabs mb-3">
+                  <li class="nav-item">
+                    <a class="nav-link" :class="authMode === 'login' ? 'active' : ''" href="#" @click.prevent="authMode = 'login'; authError = null">Вхід</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" :class="authMode === 'register' ? 'active' : ''" href="#" @click.prevent="authMode = 'register'; authError = null">Реєстрація</a>
+                  </li>
+                </ul>
+
+                <!-- Login form -->
+                <div x-show="authMode === 'login'">
+                  <div class="form-group">
+                    <input type="email" x-model="loginForm.email" class="form-control" placeholder="Email">
+                  </div>
+                  <div class="form-group">
+                    <input type="password" x-model="loginForm.password" class="form-control" placeholder="Пароль" @keyup.enter="doLogin">
+                  </div>
+                  <button @click="doLogin" class="btn btn-primary">🔑 Увійти</button>
+                </div>
+
+                <!-- Register form -->
+                <div x-show="authMode === 'register'">
+                  <div class="form-row">
+                    <div class="col-md-6 mb-2">
+                      <input type="text" x-model="registerForm.first_name" class="form-control" placeholder="Ім'я">
+                    </div>
+                    <div class="col-md-6 mb-2">
+                      <input type="text" x-model="registerForm.last_name" class="form-control" placeholder="Прізвище">
+                    </div>
+                    <div class="col-md-12 mb-2">
+                      <input type="email" x-model="registerForm.email" class="form-control" placeholder="Email">
+                    </div>
+                    <div class="col-md-12 mb-2">
+                      <input type="password" x-model="registerForm.password" class="form-control" placeholder="Пароль" @keyup.enter="doRegister">
+                    </div>
+                  </div>
+                  <button @click="doRegister" class="btn btn-success">✅ Зареєструватись</button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===================== MAIN APP ===================== -->
+        <template x-if="loggedIn">
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <h1 class="mb-0">📒 Contacts</h1>
+              <button @click="doLogout" class="btn btn-sm btn-outline-secondary">🚪 Вийти</button>
+            </div>
+            <p class="text-muted mb-4">Менеджер контактів</p>
+
+            <!-- Error -->
+            <div x-show="error" class="alert alert-danger alert-dismissible">
+              <span x-text="error"></span>
+              <button type="button" class="close" @click="error = null"><span>&times;</span></button>
+            </div>
+
+            <!-- Add Contact -->
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="section-title">Новий контакт</div>
+                <div class="form-row">
+                  <div class="col-md-6 mb-2">
+                    <input type="text" x-model="newContact.first_name" class="form-control" placeholder="Ім'я *">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <input type="text" x-model="newContact.last_name" class="form-control" placeholder="Прізвище *">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <input type="email" x-model="newContact.email" class="form-control" placeholder="Email *">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <input type="text" x-model="newContact.phone" class="form-control" placeholder="Телефон *">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <input type="date" x-model="newContact.birthday" class="form-control">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <input type="text" x-model="newContact.additional_data" class="form-control" placeholder="Додаткова інформація">
+                  </div>
+                </div>
+                <button @click="addContact" class="btn btn-primary">➕ Додати</button>
+              </div>
+            </div>
+
+            <!-- Search -->
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="section-title">Пошук</div>
+                <div class="form-row">
+                  <div class="col-md-4 mb-2">
+                    <input type="text" x-model="search.first_name" class="form-control" placeholder="Ім'я">
+                  </div>
+                  <div class="col-md-4 mb-2">
+                    <input type="text" x-model="search.last_name" class="form-control" placeholder="Прізвище">
+                  </div>
+                  <div class="col-md-4 mb-2">
+                    <input type="text" x-model="search.email" class="form-control" placeholder="Email">
+                  </div>
+                </div>
+                <button @click="doSearch" class="btn btn-outline-primary mr-2">🔍 Шукати</button>
+                <button @click="loadContacts" class="btn btn-outline-secondary mr-2">🔄 Всі контакти</button>
+                <button @click="loadBirthdays" class="btn btn-outline-warning">🎂 Дні народження (7 днів)</button>
+              </div>
+            </div>
+
+            <!-- Upcoming Birthdays -->
+            <div x-show="showBirthdays && birthdays.length > 0" class="card mb-4">
+              <div class="card-body">
+                <div class="section-title">🎂 Дні народження на найближчі 7 днів</div>
+                <template x-for="c in birthdays" :key="c.id">
+                  <span class="badge badge-birthday mr-2 mb-1 p-2" x-text="c.first_name + ' ' + c.last_name + ' — ' + c.birthday"></span>
+                </template>
+              </div>
+            </div>
+            <div x-show="showBirthdays && birthdays.length === 0" class="alert alert-info">
+              Найближчі 7 днів — без днів народження 🎉
+            </div>
+
+            <!-- Contacts List -->
+            <div class="section-title" x-text="'Контакти (' + contacts.length + ')'"></div>
+
+            <div x-show="contacts.length === 0" class="alert alert-light text-center">
+              Контактів немає. Додай першого! 👆
+            </div>
+
+            <template x-for="contact in contacts" :key="contact.id">
+              <div class="card contact-card">
+                <div class="card-body py-3">
+
+                  <!-- View mode -->
+                  <div x-show="!contact.editing">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <strong x-text="contact.first_name + ' ' + contact.last_name"></strong>
+                        <span class="text-muted ml-2" x-text="'#' + contact.id"></span><br>
+                        <small>📧 <span x-text="contact.email"></span></small><br>
+                        <small>📞 <span x-text="contact.phone"></span></small><br>
+                        <small>🎂 <span x-text="contact.birthday"></span></small>
+                        <template x-if="contact.additional_data">
+                          <div><small class="text-muted">💬 <span x-text="contact.additional_data"></span></small></div>
+                        </template>
+                      </div>
+                      <div>
+                        <button @click="contact.editing = true" class="btn btn-sm btn-outline-warning mr-1">✏️</button>
+                        <button @click="removeContact(contact.id)" class="btn btn-sm btn-outline-danger">🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Edit mode -->
+                  <div x-show="contact.editing">
+                    <div class="form-row">
+                      <div class="col-md-6 mb-2">
+                        <input type="text" x-model="contact.first_name" class="form-control form-control-sm" placeholder="Ім'я">
+                      </div>
+                      <div class="col-md-6 mb-2">
+                        <input type="text" x-model="contact.last_name" class="form-control form-control-sm" placeholder="Прізвище">
+                      </div>
+                      <div class="col-md-6 mb-2">
+                        <input type="email" x-model="contact.email" class="form-control form-control-sm" placeholder="Email">
+                      </div>
+                      <div class="col-md-6 mb-2">
+                        <input type="text" x-model="contact.phone" class="form-control form-control-sm" placeholder="Телефон">
+                      </div>
+                      <div class="col-md-6 mb-2">
+                        <input type="date" x-model="contact.birthday" class="form-control form-control-sm">
+                      </div>
+                      <div class="col-md-6 mb-2">
+                        <input type="text" x-model="contact.additional_data" class="form-control form-control-sm" placeholder="Додаткова інформація">
+                      </div>
+                    </div>
+                    <button @click="saveContact(contact)" class="btn btn-sm btn-success mr-1">💾 Зберегти</button>
+                    <button @click="contact.editing = false; loadContacts()" class="btn btn-sm btn-secondary">Скасувати</button>
+                  </div>
+
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
