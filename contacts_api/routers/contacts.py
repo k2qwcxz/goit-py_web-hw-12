@@ -27,17 +27,6 @@ async def get_all_contacts(
     return ContactCRUD.get_all(current_user.id, db)
 
 
-@router.get("/{contact_id}", response_model=ContactResponse)
-async def get_contact(
-    contact_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(auth_service.get_current_user)
-):
-    contact = ContactCRUD.get_by_id(contact_id, current_user.id, db)
-    if not contact:
-        raise HTTPException(status_code=404, detail="Contact not found")
-    return contact
-
 
 @router.get("/search/", response_model=list[ContactResponse])
 async def search_contacts(
@@ -59,6 +48,18 @@ async def get_upcoming_birthdays(
     current_user: User = Depends(auth_service.get_current_user)
 ):
     return ContactCRUD.get_birthdays(current_user.id, db, days)
+
+
+@router.get("/{contact_id}", response_model=ContactResponse)
+async def get_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth_service.get_current_user)
+):
+    contact = ContactCRUD.get_by_id(contact_id, current_user.id, db)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return contact
 
 
 @router.put("/{contact_id}", response_model=ContactResponse)

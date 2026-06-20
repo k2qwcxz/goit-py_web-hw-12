@@ -1,6 +1,8 @@
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
@@ -9,10 +11,12 @@ from jose import JWTError, jwt
 
 from .database import get_db
 
+load_dotenv()
+
 
 class Auth:
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    SECRET_KEY = "7f4e8c2a9b1d6f3e5c8a2b9d4f6e8c1a3b5d7f9e2c4a6b8d0f2e4c6a8b0d2"
+    SECRET_KEY = os.getenv("SECRET_KEY")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
     REFRESH_TOKEN_EXPIRE_DAYS = 7
